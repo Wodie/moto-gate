@@ -96,6 +96,7 @@ sub new {
 	foreach my $type ('ars', 'tms', 'loc') {
 		my $port = $h{$type . '_port'};
 		my $s = IO::Socket::INET->new(
+			LocalHost => $h{'card_ip'},
 			LocalPort => $port,
 			Proto => 'udp',
 			Blocking => 0,

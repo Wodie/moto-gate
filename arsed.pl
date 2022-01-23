@@ -88,6 +88,7 @@ print "----------------------------------------------------------------------\n"
 
 # Mototrbo
 print color('green'), "Loading Mototrbo settings...\n", color('reset');
+my $Moto_Card_IP = $config->val('Mototrbo', 'Card_IP');
 my $Admin_Radio_ID = $config->val('Mototrbo', 'Admin_Radio_ID');
 my $Master_Radio_ID = $config->val('Mototrbo', 'Master_Radio_ID');
 my $Master_Radio_IP = $config->val('Mototrbo', 'Master_Radio_IP');
@@ -101,6 +102,7 @@ my $ARS_Ping_Interval = $config->val('Mototrbo', 'ARS_Ping_Interval');
 my $GPS_Req_Interval = $config->val('Mototrbo', 'GPS_Req_Interval');
 my $TMS_Queue_Max_Age = $config->val('Mototrbo', 'TMS_Queue_Max_Age');
 my $TMS_Init_Retry_Interval = $config->val('Mototrbo', 'TMS_Init_Retry_Interval');
+print "  Card IP = $Moto_Card_IP\n";
 print "  Admin Radio ID = $Admin_Radio_ID\n";
 print "  Master Radio ID = $Master_Radio_ID\n";
 print "  Master Radio IP = $Master_Radio_IP\n";
@@ -121,6 +123,7 @@ print "----------------------------------------------------------------------\n"
 # TRBO::NET
 print color('green'), "Creating TRBO::NET\n", color('reset');
 my $Net = TRBO::NET->new(
+	'card_ip' => $Moto_Card_IP,
 	'ars_port' => $ARS_Port,
 	'loc_port' => $Loc_Port,
 	'tms_port' => $TMS_Port,
@@ -1565,6 +1568,11 @@ sub HotKeys {
 					print color('green'), "Test Message to RadioID 3341100.\n", color('reset');
 					$Net->{'tms'}->queue_msg(3341100, 'Test.');
 				}
+				case ord('M') { # 'M'
+					# Send a TMS.
+					print color('green'), "Test Message to RadioID 31216.\n", color('reset');
+					$Net->{'tms'}->queue_msg(31216, 'Test.');
+				}
 
 				case ord('Q') { # 'Q'
 					$Run = 0;
@@ -1640,7 +1648,7 @@ sub MainLoop {
 					'callsign' => $APRS_Callsign,
 					'comment' => $My_Comment
 				};
-#				APRS_IS_Push_Updates();
+				APRS_IS_Push_Updates();
 			}
 			$APRS_NextTimer = time() + $APRS_Interval;
 		}
