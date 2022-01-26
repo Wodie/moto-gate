@@ -16,10 +16,13 @@ use TRBO::Common;
 
 our @ISA = ('TRBO::Common');
 
+# no debugging by default
+my $debug = 0;
+
 sub init($) {
 	my($self) = @_;
 	
-	print color('cyan'), "TRBO::DupeCache::init\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::DupeCache::init\n", color('reset');}
 	$self->{'debug'} = 1;
 	
 	$self->_debug('init');
@@ -30,7 +33,7 @@ sub init($) {
 sub add($$) {
 	my($self, $key) = @_;
 	
-	print color('cyan'), "TRBO::DupeCache::add\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::DupeCache::add\n", color('reset');}
 	if (defined $self->{'cache'}->{$key}) {
 		$self->_debug("cache hit: $key");
 		return 1;
@@ -45,7 +48,7 @@ sub add($$) {
 sub scan($$) {
 	my($self, $timeout) = @_;
 	
-	print color('cyan'), "TRBO::DupeCache::scan\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::DupeCache::scan\n", color('reset');}
 	#$self->_debug("scan, timeout $timeout");
 	
 	my $now = time();
@@ -63,6 +66,14 @@ sub scan($$) {
 	}
 }
 
+sub debug($) {
+	my $dval = shift @_;
+	if ($dval) {
+		$debug = 1;
+	} else {
+		$debug = 0;
+	}
+}
+
 
 1;
-

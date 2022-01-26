@@ -33,6 +33,9 @@ use Data::Dumper;
 use TRBO::Common;
 our @ISA = ('TRBO::Common');
 
+# no debugging by default
+my $debug = 0;
+
 =over
 
 =item decode($data)
@@ -149,5 +152,14 @@ sub ping($$) {
 	$self->_send($id, pack('C', 0x74));
 }
 
-1;
+sub debug($) {
+	my $dval = shift @_;
+	if ($dval) {
+		$debug = 1;
+	} else {
+		$debug = 0;
+	}
+}
 
+
+1;

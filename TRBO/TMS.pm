@@ -20,6 +20,9 @@ use TRBO::DupeCache;
 use TRBO::Common;
 our @ISA = ('TRBO::Common');
 
+# no debugging by default
+my $debug = 0;
+
 # this ain't right, but it's start
 my $enc_latin = find_encoding("ISO-8859-1") || die "Could not load encoding ISO-8859-1";
 my $enc_utf8 = find_encoding("UTF-8") || die "Could not load encoding UTF-8";
@@ -378,6 +381,15 @@ sub _pack($$;$) {
 		$out = $prefix . $out;
 	}
 	return $out;
+}
+
+sub debug($) {
+	my $dval = shift @_;
+	if ($dval) {
+		$debug = 1;
+	} else {
+		$debug = 0;
+	}
 }
 
 

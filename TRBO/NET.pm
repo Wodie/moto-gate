@@ -24,6 +24,9 @@ our @ISA = ('TRBO::Common');
 
 our $VERSION = '1.00';
 
+# no debugging by default
+my $debug = 0;
+
 =head1 OBJECT INTERFACE
 
 =over
@@ -42,7 +45,7 @@ Returns new instance of TRBO::NET communicator.
 =cut
 
 sub new {
-	print color('cyan'), "TRBO::NET::new\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::NET::new\n", color('reset');}
 	my $class = shift;
 	my $self = bless { @_ }, $class;
 	
@@ -55,7 +58,7 @@ sub new {
 	# store config
 	my %h = @_;
 	$self->{'config'} = \%h;
-	#print "settings: " . Dumper(\%h);
+	#if ($debug) {print "settings: " . Dumper(\%h);}
 	
 	my %defaults = (
 		'registry_poll_interval' => 900,
@@ -162,7 +165,7 @@ to registry item.
 sub add_radio($$) {
 	my($self, $id) = @_;
 
-	print color('cyan'), "TRBO::NET::add_radio\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::NET::add_radio\n", color('reset');}
 	my %h = (
 		'id' => $id,
 		'first_heard' => 0,
@@ -192,7 +195,7 @@ Configure radio with callsign, and add to registry.
 sub configure_radio($$) {
 	my($self, $rx) = @_;
 
-	print color('cyan'), "TRBO::NET::configure_radio\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::NET::configure_radio\n", color('reset');}
 	$self->_debug("configuring radio " . $rx->{'id'} . ": " . $rx->{'callsign'});
 	
 	my $radio = $self->add_radio($rx->{'id'});
@@ -228,8 +231,8 @@ currently registered on network.
 sub register_radio($$) {
 	my($self, $rx) = @_;
 	
-	print color('bright_blue'), "TRBO::NET::register_radio\n", color('reset');
-	print color('blue');
+	if ($debug) {print color('bright_cyan'), "TRBO::NET::register_radio\n", color('reset');}
+	print color('cyan');
 	$self->_debug("Registering radio " . $rx->{'src_id'});
 	print color('reset');
 	#$self->_info($rx->{'src_id'} . ": Registering on net");
@@ -263,8 +266,11 @@ Find radio from registry by callsign.
 # A Message has been received from APRS-IS so look if user is on our DB.
 sub registry_find_call($$) {
 	my($self, $call) = @_;
-	
-	print color('bright_cyan'), "TRBO::NET::registry_find_call $call\n", color('reset');
+
+	my $debug = 1;
+	print "Call $call XXX" . length($call) . "\n";
+
+	if ($debug) {print color('cyan'), "TRBO::NET::registry_find_call $call\n", color('reset');}
 	return if (!defined $self->{'reg_call'}->{$call});
 	
 	return $self->{'reg_call'}->{$call};
@@ -273,7 +279,7 @@ sub registry_find_call($$) {
 sub _registry_heard($$) {
 	my($self, $id) = @_;
 	
-	print color('cyan'), "TRBO::NET::_registry_heard\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::NET::_registry_heard\n", color('reset');}
 
 	if (defined $self->{'registry'}->{$id}) {
 		$self->_debug("registry updating last_heard: $id");
@@ -291,7 +297,7 @@ sub _registry_heard($$) {
 sub _registry_pong($$) {
 	my($self, $id) = @_;
 	
-	print color('cyan'), "TRBO::NET::registry_pong\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::NET::registry_pong\n", color('reset');}
 	if (defined $self->{'registry'}->{$id}) {
 		$self->_debug("registry updating last_poll_rx: $id");
 		$self->{'registry'}->{$id}->{'last_poll_rx'} = time();
@@ -302,7 +308,7 @@ sub _registry_pong($$) {
 sub _registry_here($$) {
 	my($self, $id) = @_;
 
-	print color('cyan'), "TRBO::NET::_registry_here\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::NET::_registry_here\n", color('reset');}
 	if (!defined $self->{'registry'}->{$id}) {
 		return;
 	}
@@ -317,7 +323,7 @@ sub _registry_here($$) {
 sub _registry_last($$$) {
 	my($self, $id, $reason) = @_;
 
-	print color('bright_blue'), "TRBO::NET::_registry_last\n", color('reset');
+	if ($debug) {print color('bright_cyan'), "TRBO::NET::_registry_last\n", color('reset');}
 	if (!defined $self->{'registry'}->{$id}) {
 		return;
 	}	
@@ -327,7 +333,7 @@ sub _registry_last($$$) {
 sub _registry_leave($$$) {
 	my($self, $id, $reason) = @_;
 
-	print color('cyan'), "TRBO::NET::_registry_leave\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::NET::_registry_leave\n", color('reset');}
 	if (!defined $self->{'registry'}->{$id}) {
 		return;
 	}
@@ -344,7 +350,7 @@ sub _registry_leave($$$) {
 sub _registry_get($$) {
 	my($self, $id) = @_;
 
-	print color('cyan'), "TRBO::NET::_registry_get\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::NET::_registry_get\n", color('reset');}
 
 	if (!defined $self->{'registry'}->{$id}) {
 		return;
@@ -367,13 +373,13 @@ radios as necessary.
 sub registry_scan($;$) {
 	my($self, $noping) = @_;
 	
-	print color('cyan'), "TRBO::NET::_registry_scan\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::NET::_registry_scan\n", color('reset');}
 	my $now = time();
 	$self->{'ars_clients_here'} = 0;
 	
 	foreach my $id (keys %{ $self->{'registry'} }) {
 		my $r = $self->{'registry'}->{$id};
-		#print Dumper($r);
+		#if ($debug) {print Dumper($r);}
 		if ($r->{'state'} ne 'here') {
 			# no polling for stations which are not here
 			next;
@@ -406,7 +412,7 @@ Receive UDP packets on sockets and pass them to other modules.
 sub receive($) {
 	my($self) = @_;
 	
-	print color('cyan'), "TRBO::NET::receive\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::NET::receive\n", color('reset');}
 	# wait for UDP packets on any of sockets
 	my @ready = $self->{'sel'}->can_read(1);
 	
@@ -485,5 +491,17 @@ sub receive($) {
 	return \%h;
 }
 
-1;
+sub debug($) {
+	my $dval = shift @_;
+	if ($dval) {
+		$debug = 1;
+	} else {
+		$debug = 0;
+	}
+	TRBO::ARS::debug($debug);
+	TRBO::LOC::debug($debug);
+	TRBO::TMS::debug($debug);
+}
 
+
+1;

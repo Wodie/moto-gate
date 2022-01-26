@@ -14,6 +14,9 @@ TRBO::NET - A trbo parser
 
 our $VERSION = "1.3";
 
+# no debugging by default
+my $debug = 0;
+
 use strict;
 use warnings;
 use Term::ANSIColor;
@@ -53,7 +56,7 @@ sub _hex_dump($) {
 }
 
 sub new {
-	print color('cyan'), "TRBO::Common::new\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::Common::new\n", color('reset');}
 	my $class = shift;
 	my $self = bless { @_ }, $class;
 
@@ -63,7 +66,7 @@ sub new {
 	# store config
 	my %h = @_;
 	$self->{'config'} = \%h;
-	#print "settings: " . Dumper(\%h);
+	#if ($debug) {print "settings:\n" . Dumper(\%h);}
 
 	$self->{'pkts_tx'} = 0;
 	$self->{'pkts_rx'} = 0;
@@ -89,7 +92,7 @@ sub new {
 sub _clear_errors($) {
 	my($self) = @_;
 
-	print color('cyan'), "TRBO::Common::_clear_errors\n", color('reset');
+	print color('yellow'), "TRBO::Common::_clear_errors\n", color('reset');
 	$self->{'last_err_code'} = 'ok';
 	$self->{'last_err_msg'} = 'no error reported';
 }
@@ -101,7 +104,7 @@ sub _clear_errors($) {
 sub log_time {
 	my($t) = @_;
 
-	#print color('cyan'), "TRBO::Common::log_time\n", color('reset');
+	#if ($debug) {print color('cyan'), "TRBO::Common::log_time\n", color('reset');}
 	$t = time() if (!defined $t);
 
 	my(@tf) = gmtime($t);
@@ -146,7 +149,7 @@ sub _fail($$$) {
 sub _crash($$$) {
 	my($self, $rh, $code) = @_;
 
-	print color('cyan'), "TRBO::Common::_crash\n", color('reset');
+	print color('red'), "TRBO::Common::_crash\n", color('reset');
 	$rh->{'err_code'} = $code;
 
 	$self->_log("OMG: $code");
@@ -192,7 +195,7 @@ data continues).
 sub _decode_ber_int($$$) {
 	my($self, $data, $i) = @_;
 
-	print color('cyan'), "TRBO::Common::_decoder_ber_int\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::Common::_decoder_ber_int\n", color('reset');}
 	my $i_start = $i;
 	my $n = unpack('C', substr($data, $i, 1));
 	my $sign = $n & 0x40;
@@ -216,7 +219,7 @@ sub _decode_ber_int($$$) {
 sub _decode_ber_uint($$$){
 	my($self, $data, $i) = @_;
 
-	#print color('cyan'), "TRBO::Common::_decoder_ber_uint\n", color('reset');
+	#if ($debug) {print color('cyan'), "TRBO::Common::_decoder_ber_uint\n", color('reset');}
 	my $i_start = $i;
 	my $n = unpack('C', substr($data, $i, 1));
 	my $no = $n & 0x7f;
@@ -237,7 +240,7 @@ sub _decode_ber_uint($$$){
 sub _encode_ber_uint($$) {
 	my($self, $int) = @_;
 
-	print color('cyan'), "TRBO::Common::_encoder_ber_uint\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::Common::_encoder_ber_uint\n", color('reset');}
 	my $out = '';
 
 	#$self->_debug("_encode_ber_uint $int");
@@ -270,7 +273,7 @@ which can pass to sendmsg() direct.
 sub _make_addr($$;$) {
 	my($self, $id, $group_net) = @_;
 
-	print color('cyan'), "TRBO::Common::_make_addr\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::Common::_make_addr\n", color('reset');}
 	my $host = (defined $group_net && ($group_net)) ? $self->{'config'}->{'cai_group_net'} : $self->{'config'}->{'cai_net'};
 	$host .= '.' . (($id >> 16) & 0xff) .'.' . (($id >> 8) & 0xff) . '.' . ($id & 0xff);
 	my $hisiaddr = inet_aton($host);
@@ -320,7 +323,7 @@ sub _send($$$;$$) {
 sub _rx_accounting($$) {
 	my($self, $msg) = @_;
 
-	#print color('cyan'), "TRBO::Common::_rx_accounting\n", color('reset');
+	#if ($debug) {print color('cyan'), "TRBO::Common::_rx_accounting\n", color('reset');}
 	$self->{'pkts_rx'} += 1;
 	$self->{'bytes_rx'} += length($msg);
 }
@@ -328,7 +331,7 @@ sub _rx_accounting($$) {
 sub _pack($$;$) {
 	my($self, $data, $prefix) = @_;
 
-	#print color('cyan'), "TRBO::Common::pack\n", color('reset');
+	#if ($debug) {print color('cyan'), "TRBO::Common::pack\n", color('reset');}
 	my $out = pack('n', length($data)) . $data;
 	if (defined $prefix) {
 		$out = $prefix . $out;
@@ -336,6 +339,14 @@ sub _pack($$;$) {
 	return $out;
 }
 
+sub debug($) {
+	my $dval = shift @_;
+	if ($dval) {
+		$debug = 1;
+	} else {
+		$debug = 0;
+	}
+}
+
 
 1;
-
