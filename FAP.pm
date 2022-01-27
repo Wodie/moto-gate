@@ -3102,7 +3102,7 @@ sub make_message($$$) {
 
 	# Add msg id if defined.
 	if (defined $msg_id) {
-		$packetbody .= $msg_id;
+		$packetbody .= "{$msg_id}";
 	}
 
 	return $packetbody;

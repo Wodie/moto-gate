@@ -46,7 +46,7 @@ use constant RevisionInfo => 0;
 my $Version = VersionInfo . '.' . MinorVersionInfo . '-' . RevisionInfo;
 print "\n##################################################################\n";
 print "	*** $AppName v$Version ***\n";
-print "	Released: January 25, 2022. Created March 07, 2015.\n";
+print "	Released: January 26, 2022. Created March 07, 2015.\n";
 print "	Created by:\n";
 print "	Juan Carlos Pérez De Castro (Wodie) KM4NNO / XE1F\n";
 print "	Based on David Kierzkowski KD8EYF TRBO-NET code.\n";
@@ -243,7 +243,7 @@ $Users = shift @$Conf;
 # configure radios
 while (my $Radio = shift @$Conf) {
 	$Net->configure_radio($Radio);
-	print "  radio: " . Dumper($Radio);
+	print "  Radio:\n" . Dumper($Radio);
 }
 
 Reload_State();
@@ -377,48 +377,57 @@ sub APRS_IS_Process_Rx_Net_Msg($) {
 	if ($APRS_Verbose >= 1) {print Dumper($PacketData);}
 
 	# Check if APRS-IS Callsign is on registered users file.
-	my $radio = $Net->registry_find_call($PacketData->{'destination'});
-	return if (!defined $radio); # Not found
-print "one\n";
+	my $Radio = $Net->registry_find_call($PacketData->{'destination'});
+	return if (!defined $Radio); # Not found
 	my $cacheid;
 	if (defined $PacketData->{'messageid'}) {
-print "two\n";
-		$APRS_IS->sendline(APRS_IS_Make_Ack($PacketData->{'destination'},
+		print "  destination = $PacketData->{'destination'}, srccallsign = $PacketData->{'srccallsign'}, " .
+		"messageid = $PacketData->{'messageid'}\n";
+		
+		my $Packet = sprintf(APRS_IS_Make_Ack($PacketData->{'destination'},
 			$PacketData->{'srccallsign'}, $PacketData->{'messageid'}));
+		print color('blue'), "  $Packet\n", color('reset');
+		my $Res = $APRS_IS->sendline($Packet);
+		if (!$Res) {
+			print color('red'), "Error sending APRS-IS Ack packet $Res\n", color('reset');
+			$APRS_IS->disconnect();
+			return;
+		}
+		print "  Ack Sent.\n";
+		
 		$cacheid = md5_hex($PacketData->{'srccallsign'} . '_' .
 			$PacketData->{'destination'} . '_' . $PacketData->{'messageid'});
 	} else {
-print "three\n";
+		print "three\n";
 		$cacheid = md5_hex($PacketData->{'srccallsign'} . '_' .
 			$PacketData->{'destination'} . '_' . $PacketData->{'message'});
 	}
 
 	if ($aprs_msg_cache->add($cacheid)) {
-print "four\n";
-		print "APRS-IS message gateway dupe ignored: IS>TRBO " .
+		print "four\n";
+		print "  Dupe ignored: APRS-IS to Mototrbo " .
 			$PacketData->{'srccallsign'} . '>' . $PacketData->{'destination'} .
-				" " . $radio->{'id'}
+				" " . $Radio->{'id'}
 			. ((defined $PacketData->{'messageid'}) ? '(id ' . $PacketData->{'messageid'} . ')' : '')
 			. ": " . $PacketData->{'message'} . "\n";
 		return;
 	}
 
-print "five\n";
-	print "APRS-IS message gateway: APRS-IS>MtotoTrbo "
-		. $PacketData->{'srccallsign'} . '>' . $PacketData->{'destination'} .
-			" " . $radio->{'id'}
-		. ": " . $PacketData->{'message'} . "\n";
+	print "  APRS-IS to Mototrbo: "
+		. $PacketData->{'srccallsign'} . ' to ' . $PacketData->{'destination'} .
+			" " . $Radio->{'id'}
+		. "msg = " . $PacketData->{'message'} . "\n";
 
-	$Net->{'tms'}->queue_msg($radio->{'id'}, 'APRS ' . $PacketData->{'srccallsign'} .
+	$Net->{'tms'}->queue_msg($Radio->{'id'}, 'APRS ' . $PacketData->{'srccallsign'} .
 		': ' . $PacketData->{'message'});
 }
 
 sub APRS_IS_Make_Ack($$$) {
-	my($src, $dst, $id) = @_;
-	return sprintf("%s>APRS::%-9s:ack%s", $src, $dst, $id);
+	my($src, $dst, $msgid) = @_;
+	return sprintf("%s>APRS::%-9s:ack%s", $src, $dst, $msgid);
 }
 
-sub APRS_IS_Push_Updates() {
+sub APRS_IS_Push_Position_Updates() {
 	# Look if APRS-IS object exist (it could happen? IDK).
 	if (!$APRS_IS) {
 		@upd_q = ();
@@ -448,8 +457,8 @@ sub APRS_IS_Push_Updates() {
 		);
 		print "$APRS_Position\n";
 
-		if ($ent->{'comment'} eq '') {
-			$ent->{'comment'} = ' ';
+		if (!defined $ent->{'comment'}) {
+			$ent->{'comment'} = '';
 		};
 
 		my $Packet = sprintf('%s>APTR01:%s', $ent->{'callsign'}, $APRS_Position . $ent->{'comment'});
@@ -460,7 +469,7 @@ sub APRS_IS_Push_Updates() {
 			$APRS_IS->disconnect();
 			return;
 		}
-		print "  Push Updates Done.\n";
+		print "  Push Update Done.\n";
 	}
 	@upd_q = (); # Flush variable.
 }
@@ -988,7 +997,7 @@ print "four\n";
 	}
 
 	my $state = from_json($res->content);
-	print Dumper($state);
+	print "  state\n" . Dumper($state);
 
 	return if (!defined $state);
 	return if ($state->{'status'} ne 'OK');
@@ -1087,14 +1096,14 @@ sub Reload_State() {
 	return if (!defined $state->{'registry'});
 
 	my $reg = $Net->{'registry'};
-	foreach my $radio (values %{ $state->{'registry'} }) {
-		if (!defined $reg->{$radio->{'id'}}) {
-			print "  Reload_State: radio " . $radio->{'id'} . " not configured, ignoring\n";
+	foreach my $Radio (values %{ $state->{'registry'} }) {
+		if (!defined $reg->{$Radio->{'id'}}) {
+			print "  Reload_State: radio " . $Radio->{'id'} . " not configured, ignoring\n";
 			next;
 		}
-		print "  Reload_State: reloading radio " . $radio->{'id'} . "\n";
+		print "  Reload_State: reloading radio " . $Radio->{'id'} . "\n";
 		for my $k ('last_poll_tx', 'last_poll_rx', 'first_heard', 'last_heard', 'away_reason', 'state', 'heard_what') {
-			$reg->{$radio->{'id'}}{$k} = $radio->{$k};
+			$reg->{$Radio->{'id'}}{$k} = $Radio->{$k};
 		}
 	}
 
@@ -1108,29 +1117,29 @@ sub Reload_State() {
 # Process Received TMS Command
 ###############################################################################
 sub Process_Rx_Msg($) {
-	my($rx) = @_;
+	my($Rx) = @_;
 
 	print color('green'),"Process_Rx_Msg\n", color('reset');
-	#print Dumper($rx);
+	#print Dumper($Rx);
 
-	if ($rx->{'text'} =~ /^\s*([a-z]+)\s*/i) {
+	if ($Rx->{'text'} =~ /^\s*([a-z]+)\s*/i) {
 		my($cmd) = lc($1);
-		print"  Command = '$cmd' from = $rx->{'src_id'}\n";
-		my $t = $rx->{'text'};
+		print"  Command = '$cmd' from = $Rx->{'src_id'}\n";
+		my $t = $Rx->{'text'};
 		$t =~ s/^\s+//;
 		$t =~ s/\s+$//;
 		$t =~ s/\s+/ /g;
 		my @args = split(' ', $t);
 
 		if (defined $cmds{$cmd}) {
-			$cmds{$cmd}($rx, \@args);
+			$cmds{$cmd}($Rx, \@args);
 			return;
 		}
 	} else {
 		print color('yellow'), "  Invalid Command.\n", color('reset');
 	}
 
-	Cmd_Help($rx);
+	Cmd_Help($Rx);
 }
 
 
@@ -1139,7 +1148,7 @@ sub Process_Rx_Msg($) {
 # Cmd APRS_IS
 ###############################################################################
 sub Cmd_APRS_IS($$) {
-	my($rx, $args) = @_;
+	my($Rx, $args) = @_;
 
 	my($cmd, $dst, @words) = @$args;
 	my $msg = join(' ', @words);
@@ -1150,17 +1159,20 @@ sub Cmd_APRS_IS($$) {
 	my $now = time();
 	# Send specific help for incomplete messages.
 	if (!defined $dst || $dst eq '' || $msg eq '') {
-		$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'Usage: APRS <callsign> <message>');
+		$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'Usage: APRS <callsign> <message>');
 		return;
 	}
 
 	$dst = uc($dst); # Make destination callsign uppercase.
 	print "  cmd = $cmd, dst = $dst, msg = $msg\n";
 
+	my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = gmtime(time);
+	my $MsgID = "$min$sec";
+
 	my $APRS_IS_Message = Ham::APRS::FAP::make_message(
 		$dst,
 		$msg,
-		'{001' # seq if aknowlegement expected, up to 5 char.
+		$MsgID # seq if aknowlegement expected, up to 5 char.
 	);
 	print "  $APRS_IS_Message\n";
 
@@ -1168,19 +1180,19 @@ sub Cmd_APRS_IS($$) {
 
 	# KM4NNO-DM>APTR01:!1923.06NM09908.68W&/A=007323Testing_Moto_X Gateway
 
-	my $Packet = sprintf('%s>APTR01:%s', $rx->{'registry'}->{'callsign'}, $APRS_IS_Message);
+	my $Packet = sprintf('%s>APTR01:%s', $Rx->{'registry'}->{'callsign'}, $APRS_IS_Message);
 	print color('blue'), "  $Packet\n", color('reset');
 	my $Res = $APRS_IS->sendline($Packet);
 
 	if (!$Res) {
 		print color('red'), "  Error sending APRS-IS message from " .
-			$rx->{'registry'}->{'callsign'} . " to $dst\n", color('reset');
+			$Rx->{'registry'}->{'callsign'} . " to $dst\n", color('reset');
 		$APRS_IS->disconnect();
 	}
 }
 
 sub Cmd_APRS_IS_Obj($$) {
-	my($rx, $args) = @_;
+	my($Rx, $args) = @_;
 
 	my($cmd, $name, $symbol_name, @words) = @$args;
 	my $comment = join(' ', @words);
@@ -1191,7 +1203,7 @@ sub Cmd_APRS_IS_Obj($$) {
 	my $now = time();
 	# Send specific help for incomplete messages.
 	if (!defined $name || $name eq '' || !defined $symbol_name || $symbol_name eq '' || $comment eq '') {
-		$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'Usage: Obj <name> <symbol> <comment>');
+		$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'Usage: Obj <name> <symbol> <comment>');
 		return;
 	}
 
@@ -1199,8 +1211,8 @@ sub Cmd_APRS_IS_Obj($$) {
 	my $APRS_IS_Object = Ham::APRS::FAP::make_object(
 		$name,
 		0, # timestamp (current == 0)
-		$rx->{'registry'}->{'last_lat'},
-		$rx->{'registry'}->{'last_lng'},
+		$Rx->{'registry'}->{'last_lat'},
+		$Rx->{'registry'}->{'last_lng'},
 		(defined $symbol) ? $symbol : '\.', # symbol
 		-1, # Speed
 		-1, # Course
@@ -1212,13 +1224,13 @@ sub Cmd_APRS_IS_Obj($$) {
 	);
 	print $APRS_IS_Object;
 
-	my $Packet = sprintf('%s>APTR01:%s', $rx->{'registry'}->{'callsign'}, $APRS_IS_Object);
+	my $Packet = sprintf('%s>APTR01:%s', $Rx->{'registry'}->{'callsign'}, $APRS_IS_Object);
 	print color('blue'), "  $Packet\n", color('reset');
 	my $Res = $APRS_IS->sendline($Packet);
 
 	if (!$Res) {
 		print color('red'), "  Error sending APRS-IS object from " .
-			$rx->{'registry'}->{'callsign'} . " $name\n", color('reset');
+			$Rx->{'registry'}->{'callsign'} . " $name\n", color('reset');
 		$APRS_IS->disconnect();
 	}
 }
@@ -1227,11 +1239,11 @@ sub Cmd_APRS_IS_Obj($$) {
 # Cmd_Ctrl
 ###############################################################################
 sub Cmd_Ctrl($$) {
-	my($rx, $args) = @_;
+	my($Rx, $args) = @_;
 
 	my($cmd, $sub_cmd, @words) = @$args;
 	my $msg = join(' ', @words);
-	print color('green'), "Cmd_Ctrl user $rx->{'registry'}->{'callsign'}, ID $rx->{'src_id'}" .
+	print color('green'), "Cmd_Ctrl user $Rx->{'registry'}->{'callsign'}, ID $Rx->{'src_id'}" .
 		" sub_cmd $sub_cmd value $msg\n", color('reset');
 
 	return if (!$APRS_IS);
@@ -1250,8 +1262,8 @@ sub Cmd_Ctrl($$) {
 #	};
 	# Kill app:
 	if (lc($sub_cmd) eq 'kill') {
-		$Net->{'tms'}->queue_msg($Admin_Radio_ID, "Radio " . $rx->{'src_id'} . ' killed $AppName.');
-		die("Warning: radio " . $rx->{'src_id'} . " killed $AppName.");
+		$Net->{'tms'}->queue_msg($Admin_Radio_ID, "Radio " . $Rx->{'src_id'} . ' killed $AppName.');
+		die("Warning: radio " . $Rx->{'src_id'} . " killed $AppName.");
 	}
 }
 
@@ -1259,20 +1271,20 @@ sub Cmd_Ctrl($$) {
 # Cmd_email
 ###############################################################################
 sub Cmd_email($$) {
-	my($rx, $args) = @_;
+	my($Rx, $args) = @_;
 
 	my($cmd, $dst, @words) = @$args;
 	my $msg = join(' ', @words);
-	print color('green'), "Cmd_email . $rx->{'registry'}->{'callsign'} To: $dst " .
+	print color('green'), "Cmd_email . $Rx->{'registry'}->{'callsign'} To: $dst " .
 		"Body: $msg\n", color('reset');
 
-	my $subject= "DMR originated e-mail from: $rx->{'registry'}->{'name'}, callsign " .
-		$rx->{'registry'}->{'short_callsign'};
-	my $body= $msg . "\n\n $rx->{'registry'}->{'name'}\n $rx->{'registry'}->{'short_callsign'}";
+	my $subject= "DMR originated e-mail from: $Rx->{'registry'}->{'name'}, callsign " .
+		$Rx->{'registry'}->{'short_callsign'};
+	my $body= $msg . "\n\n $Rx->{'registry'}->{'name'}\n $Rx->{'registry'}->{'short_callsign'}";
 
 #	my $mail=Email::Send::SMTP::Gmail->new( -smtp=>'smtp.gmail.com',
-#	-login=>$rx->{'registry'}->{'email_username'},
-#		-pass=>$rx->{'registry'}->{'email_password'},
+#	-login=>$Rx->{'registry'}->{'email_username'},
+#		-pass=>$Rx->{'registry'}->{'email_password'},
 #	-layer=>'ssl',
 #	-port=>465,
 ##	-verbose=>1,
@@ -1289,29 +1301,40 @@ sub Cmd_email($$) {
 #	);
 #	$mail->bye;
 
-	print "email Sent by: $rx->{'registry'}->{'name'} $rx->{'registry'}->{'short_callsign'}.\n";
+	print "email Sent by: $Rx->{'registry'}->{'name'} $Rx->{'registry'}->{'short_callsign'}.\n";
+}
+
+###############################################################################
+# Cmd_Help
+###############################################################################
+sub Cmd_Help($) {
+	my($Rx) = @_;
+
+	# Reply with a TMS listing the commands available.
+	print color('green'), "Cmd_Help to RadioID $Rx->{'src_id'}\n", color('reset');
+	$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'Commands: A or APRS, Ctrl, e or email, h or Help, Ping, SMS, WEA, W or Who');
 }
 
 ###############################################################################
 # Cmd_Ping
 ###############################################################################
 sub Cmd_ping($$) {
-	my($rx) = @_;
+	my($Rx) = @_;
 
-	print color('green'), "Cmd_ping from $rx->{'src_id'}\n", color('reset');
+	print color('green'), "Cmd_ping from $Rx->{'src_id'}\n", color('reset');
 	my $datestring = gmtime();
-	$Net->{'tms'}->queue_msg($rx->{'src_id'}, "Pong to: $rx->{'src_id'} GMT=$datestring.");
+	$Net->{'tms'}->queue_msg($Rx->{'src_id'}, "Pong to: $Rx->{'src_id'} GMT=$datestring.");
 }
 
 ###############################################################################
 # Cmd_SMS
 ###############################################################################
 sub Cmd_SMS($$) {
-	my($rx, $args) = @_;
+	my($Rx, $args) = @_;
 
 	my($cmd, $dst, @words) = @$args;
 	my $msg = join(' ', @words);
-	print color('green'), "Cmd_SMS from $rx->{'registry'}->{'callsign'} to $dst $msg\n", color('reset');
+	print color('green'), "Cmd_SMS from $Rx->{'registry'}->{'callsign'} to $dst $msg\n", color('reset');
 
 	# This block is from Bulk SMS code samples, Perl version.
 	my $ua = LWP::UserAgent->new(timeout => 30);
@@ -1324,16 +1347,16 @@ sub Cmd_SMS($$) {
 	my $req = HTTP::Request->new(POST =>'http://bulksms.vsms.net/eapi/submission/send_sms/2/2.0');
 	$req->content_type('application/x-www-form-urlencoded');
 
-	$req->content('username=' . $rx->{'registry'}->{'sms_username'} . '&password=' .
-		$rx->{'registry'}->{'sms_password'} . '&msisdn=' . $dst . 
-	'&sender=' . $rx->{'registry'}->{'sms_sender_id'} . '&repliable=0' . '&message= ' . $msg .
-	' From: ' . $rx->{'registry'}->{'short_callsign'} . ' ' . $rx->{'registry'}->{'sms_reply_phone'}
+	$req->content('username=' . $Rx->{'registry'}->{'sms_username'} . '&password=' .
+		$Rx->{'registry'}->{'sms_password'} . '&msisdn=' . $dst . 
+	'&sender=' . $Rx->{'registry'}->{'sms_sender_id'} . '&repliable=0' . '&message= ' . $msg .
+	' From: ' . $Rx->{'registry'}->{'short_callsign'} . ' ' . $Rx->{'registry'}->{'sms_reply_phone'}
 	);
 
-	print 'username=' . $rx->{'registry'}->{'sms_username'} . '&password=' .
-		$rx->{'registry'}->{'sms_password'} . '&msisdn=' . $dst .
-	'&sender=' . $rx->{'registry'}->{'sms_sender_id'} . '&repliable=0' . '&message=' . $msg .
-		' From: ' . $rx->{'registry'}->{'short_callsign'} . ' ' . $rx->{'registry'}->{'sms_reply_phone'} . "\n";
+	print 'username=' . $Rx->{'registry'}->{'sms_username'} . '&password=' .
+		$Rx->{'registry'}->{'sms_password'} . '&msisdn=' . $dst .
+	'&sender=' . $Rx->{'registry'}->{'sms_sender_id'} . '&repliable=0' . '&message=' . $msg .
+		' From: ' . $Rx->{'registry'}->{'short_callsign'} . ' ' . $Rx->{'registry'}->{'sms_reply_phone'} . "\n";
 
 	my $res = $ua->request($req);
 
@@ -1346,12 +1369,11 @@ sub Cmd_SMS($$) {
 
 	if ($result_code eq '0') {
 		print "Message sent: batch $batch_id\n";
-		$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'SMS Sent.');
-		$APRS_IS->disconnect();# This line comes from original arsed.
+		$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'SMS Sent.');
 	}
 	else {
 		print "Error sending: $result_code: $result_string\n";
-		$Net->{'tms'}->queue_msg($rx->{'src_id'}, "SMS Error sending: $result_code: $result_string.");
+		$Net->{'tms'}->queue_msg($Rx->{'src_id'}, "SMS Error sending: $result_code: $result_string.");
 	}
 	print "\n";
 	#Bulk SMS block end.
@@ -1361,7 +1383,7 @@ sub Cmd_SMS($$) {
 # Weather
 ###############################################################################
 sub Cmd_WEA($$) {
-	my($rx, $args) = @_;
+	my($Rx, $args) = @_;
 
 	my($cmd, @words) = @$args;
 	my $msg = join(' ', @words);
@@ -1369,7 +1391,7 @@ sub Cmd_WEA($$) {
 
 	# Send specific help for incomplete messages.
 	if (!defined $msg || $msg eq '') {
-		$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'Usage: Wea <RadioID>');
+		$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'Usage: Wea <RadioID>');
 		return;
 	}
 
@@ -1380,22 +1402,22 @@ sub Cmd_WEA($$) {
 	#$msg = "$place at $updated Temp: $temp_c, wind: $wind_kmph kmph $wind_dir, Humidity: $humidity, Press: $pressure";
 	print "  Message: $msg\n";
 
-	print "Weather report to radio: $rx->{'registry'}->{'callsign'} > $msg\n";
-	$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'WEA: ' . $msg);
+	print "Weather report to radio: $Rx->{'registry'}->{'callsign'} > $msg\n";
+	$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'WEA: ' . $msg);
 }
 
 ###############################################################################
 # Command Where
 ###############################################################################
 sub Cmd_Where($$) {
-	my($rx, $args) = @_;
+	my($Rx, $args) = @_;
 	
 	my($cmd, $dst) = @$args;
-	print color('green'), "Cmd_Where from $rx->{'src_id'} about $rx->{'src_id'}\n", color('reset');
+	print color('green'), "Cmd_Where from $Rx->{'src_id'} about $Rx->{'src_id'}\n", color('reset');
 
 	# Send specific help for incomplete messages.
 	if (!defined $dst || $dst eq '') {
-		$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'Usage: Where <RadioID>');
+		$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'Usage: Where <RadioID>');
 		return;
 	}
 
@@ -1403,25 +1425,25 @@ sub Cmd_Where($$) {
 	if (defined $dst) {
 		my @matches;
 		my $match;
-		foreach my $radio (values %{ $Net->{'registry'} }) {
-			my $s = (defined $radio->{'callsign'}) ? $radio->{'callsign'} : $radio->{'id'};
-			if (index($radio->{'id'}, $dst) >= 0) {
-				$match = $radio;
+		foreach my $Radio (values %{ $Net->{'registry'} }) {
+			my $s = (defined $Radio->{'callsign'}) ? $Radio->{'callsign'} : $Radio->{'id'};
+			if (index($Radio->{'id'}, $dst) >= 0) {
+				$match = $Radio;
 				push @matches, $s;
 				next;
 			}
-			if (defined $radio->{'callsign'} && index(uc($radio->{'callsign'}), uc($dst)) >= 0) {
-				$match = $radio;
+			if (defined $Radio->{'callsign'} && index(uc($Radio->{'callsign'}), uc($dst)) >= 0) {
+				$match = $Radio;
 				push @matches, $s;
 				next;
 			}
 		}
 		if (!@matches) {
-			$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'No match for ' . $dst);
+			$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'No match for ' . $dst);
 			return;
 		}
 		if ($#matches > 0) {
-			$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'Multiple matches: ' . join(' ', @matches));
+			$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'Multiple matches: ' . join(' ', @matches));
 			return;
 		}
 
@@ -1442,41 +1464,41 @@ sub Cmd_Where($$) {
 		}
 
 		print "  Reply = $s\n";
-		$Net->{'tms'}->queue_msg($rx->{'src_id'}, $s);
+		$Net->{'tms'}->queue_msg($Rx->{'src_id'}, $s);
 		return;
 	}
 
 	my @Here;
-	foreach my $radio (sort { $b->{'last_heard'} <=> $a->{'last_heard'} } values %{ $Net->{'registry'} }) {
-		#print Dumper($radio);
-		if ($radio->{'state'} eq 'here') {
-			print "  User Data: " . Dumper($radio);
-			my $s = (defined $radio->{'callsign'}) ? $radio->{'callsign'} : $radio->{'id'};
-			if ($now - $radio->{'last_heard'} > $ARS_Timeout/2) {
+	foreach my $Radio (sort { $b->{'last_heard'} <=> $a->{'last_heard'} } values %{ $Net->{'registry'} }) {
+		#print Dumper($Radio);
+		if ($Radio->{'state'} eq 'here') {
+			print "  Radio: " . Dumper($Radio);
+			my $s = (defined $Radio->{'callsign'}) ? $Radio->{'callsign'} : $Radio->{'id'};
+			if ($now - $Radio->{'last_heard'} > $ARS_Timeout/2) {
 				$s = lc($s);
 			}
-			if (defined $radio->{'last_loc'} && $now - $radio->{'last_loc'} < 15*60 && ($radio->{'last_lat'})) {
+			if (defined $Radio->{'last_loc'} && $now - $Radio->{'last_loc'} < 15*60 && ($Radio->{'last_lat'})) {
 				$s .= '*'; 
 			}
 			push @Here, $s;
 			print "  Reply = $s\n";
 		}
 	}
-	$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'Available: ' . join(' ', @Here));
+	$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'Available: ' . join(' ', @Here));
 }
 
 ###############################################################################
 # Command Who
 ###############################################################################
 sub Cmd_Who($$) {
-	my($rx, $args) = @_;
+	my($Rx, $args) = @_;
 
 	my($cmd, $dst) = @$args;
-	print color('green'), "Cmd_Who from $rx->{'src_id'} ask about $dst\n", color('reset');
+	print color('green'), "Cmd_Who from $Rx->{'src_id'} ask about $dst\n", color('reset');
 
 	# Send specific help for incomplete messages.
 	if (!defined $dst || $dst eq '') {
-		$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'Usage: Who <RadioID>');
+		$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'Usage: Who <RadioID>');
 		return;
 	}
 
@@ -1484,25 +1506,25 @@ sub Cmd_Who($$) {
 	if (defined $dst) {
 		my @matches;
 		my $match;
-		foreach my $radio (values %{ $Net->{'registry'} }) {
-			my $s = (defined $radio->{'callsign'}) ? $radio->{'callsign'} : $radio->{'id'};
-			if (index($radio->{'id'}, $dst) >= 0) {
-				$match = $radio;
+		foreach my $Radio (values %{ $Net->{'registry'} }) {
+			my $s = (defined $Radio->{'callsign'}) ? $Radio->{'callsign'} : $Radio->{'id'};
+			if (index($Radio->{'id'}, $dst) >= 0) {
+				$match = $Radio;
 				push @matches, $s;
 				next;
 			}
-			if (defined $radio->{'callsign'} && index(uc($radio->{'callsign'}), uc($dst)) >= 0) {
-				$match = $radio;
+			if (defined $Radio->{'callsign'} && index(uc($Radio->{'callsign'}), uc($dst)) >= 0) {
+				$match = $Radio;
 				push @matches, $s;
 				next;
 			}
 		}
 		if (!@matches) {
-			$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'No match for ' . $dst);
+			$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'No match for ' . $dst);
 			return;
 		}
 		if ($#matches > 0) {
-			$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'Multiple matches: ' . join(' ', @matches));
+			$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'Multiple matches: ' . join(' ', @matches));
 			return;
 		}
 	
@@ -1512,27 +1534,27 @@ sub Cmd_Who($$) {
 		}
 
 		print "  Reply = $s\n";
-		$Net->{'tms'}->queue_msg($rx->{'src_id'}, $s);
+		$Net->{'tms'}->queue_msg($Rx->{'src_id'}, $s);
 		return;
 	}
 
 	my @Here;
-	foreach my $radio (sort { $b->{'last_heard'} <=> $a->{'last_heard'} } values %{ $Net->{'registry'} }) {
-		#print Dumper($radio);
-		if ($radio->{'state'} eq 'here') {
-			print "Who User Data: " . Dumper($radio);
-			my $s = (defined $radio->{'callsign'}) ? $radio->{'callsign'} : $radio->{'id'};
-			if ($now - $radio->{'last_heard'} > $ARS_Timeout/2) {
+	foreach my $Radio (sort { $b->{'last_heard'} <=> $a->{'last_heard'} } values %{ $Net->{'registry'} }) {
+		#print Dumper($Radio);
+		if ($Radio->{'state'} eq 'here') {
+			print "  Radio: " . Dumper($Radio);
+			my $s = (defined $Radio->{'callsign'}) ? $Radio->{'callsign'} : $Radio->{'id'};
+			if ($now - $Radio->{'last_heard'} > $ARS_Timeout/2) {
 				$s = lc($s);
 			}
-			if (defined $radio->{'last_loc'} && $now - $radio->{'last_loc'} < 15*60 && ($radio->{'last_lat'})) {
+			if (defined $Radio->{'last_loc'} && $now - $Radio->{'last_loc'} < 15*60 && ($Radio->{'last_lat'})) {
 				$s .= '*'; 
 			}
 			push @Here, $s;
 			print "  Reply = $s\n";
 		}
 	}
-	$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'Available: ' . join(' ', @Here));
+	$Net->{'tms'}->queue_msg($Rx->{'src_id'}, 'Available: ' . join(' ', @Here));
 }
 
 sub dur_str($) {
@@ -1575,17 +1597,6 @@ sub dur_str($) {
 	}
 
 	return $str;
-}
-
-###############################################################################
-# Cmd_Help
-###############################################################################
-sub Cmd_Help($) {
-	my($rx) = @_;
-
-	# Reply with a TMS listing the commands available.
-	print color('green'), "Cmd_Help to RadioID $rx->{'src_id'}\n", color('reset');
-	$Net->{'tms'}->queue_msg($rx->{'src_id'}, 'Commands: A or APRS, Ctrl, e or email, h or Help, Ping, SMS, WEA, W or Who');
 }
 
 
@@ -1660,11 +1671,11 @@ sub Consider_LOC_Requests()
 
 	foreach my $id (keys %{ $reg }) {
 		if (defined $reg->{$id}->{'consider_loc_req'} && $reg->{$id}->{'consider_loc_req'} < time()) {
-			my $radio = $reg->{$id};
-			delete $radio->{'consider_loc_req'};
-			next if ($radio->{'state'} ne 'here');
+			my $Radio = $reg->{$id};
+			delete $Radio->{'consider_loc_req'};
+			next if ($Radio->{'state'} ne 'here');
 			# loc request configured, check if we have received locs recently
-			if (!defined $radio->{'last_loc'} || $radio->{'last_loc'} < time() - 7200) {
+			if (!defined $Radio->{'last_loc'} || $Radio->{'last_loc'} < time() - 7200) {
 				$Net->{'loc'}->request_locs($id, $GPS_Req_Interval - 10 + int(rand(30)));
 			}
 		}
@@ -1683,20 +1694,20 @@ sub HotKeys {
 			# No key yet.
 		} else {
 			# Testing user data
-			my $rx;
-			$rx->{'src_id'} = 3341100;
-			$rx->{'msg'} = 'msg';
-			$rx->{'class'} = 'tms';
-			$rx->{'registry'}->{'callsign'} = 'XE1F';
-			$rx->{'registry'}->{'short_callsign'} = 'XE1F';
-			$rx->{'registry'}->{'name'} = 'Juan C';
-			$rx->{'registry'}->{'symbol'} = '/[';
-			$rx->{'registry'}->{'email_username'} = 'wodielite@gmail.com';
-			$rx->{'registry'}->{'email_password'} = '1234';
-			$rx->{'registry'}->{'sms_username'} = 'Wodie';
-			$rx->{'registry'}->{'sms_password'} = '1234';
-			$rx->{'registry'}->{'sms_reply_id'} = 'youurid';
-			$rx->{'registry'}->{'sms_reply_phone'} = '+52(55)54356002';
+			my $Rx;
+			$Rx->{'src_id'} = 3341100;
+			$Rx->{'msg'} = 'msg';
+			$Rx->{'class'} = 'tms';
+			$Rx->{'registry'}->{'callsign'} = 'XE1F';
+			$Rx->{'registry'}->{'short_callsign'} = 'XE1F';
+			$Rx->{'registry'}->{'name'} = 'Juan C';
+			$Rx->{'registry'}->{'symbol'} = '/[';
+			$Rx->{'registry'}->{'email_username'} = 'wodielite@gmail.com';
+			$Rx->{'registry'}->{'email_password'} = '1234';
+			$Rx->{'registry'}->{'sms_username'} = 'Wodie';
+			$Rx->{'registry'}->{'sms_password'} = '1234';
+			$Rx->{'registry'}->{'sms_reply_id'} = 'youurid';
+			$Rx->{'registry'}->{'sms_reply_phone'} = '+52(55)54356002';
 
 			switch (ord($key)) {
 				case 0x1B { # Escape
@@ -1704,15 +1715,13 @@ sub HotKeys {
 					$Run = 0;
 				}
 				case ord('A') { # 'A'
-#					APRS_Update();
-#					$APRS_NextTimer = time() + $APRS_Interval;
+					$Rx->{'text'} = 'aprs KM4NNO-7 Testing msg 01';
+					print "  HotKeys A Rx\n" . Dumper($Rx);
+					Process_Rx_Msg($Rx);
 					$APRS_Verbose = 1;
 				}
 				case ord('a') { # 'a'
 					$APRS_Verbose = 0;
-					$rx->{'text'} = 'aprs xe1efq-7 Testing msg 01';
-					print "  HotKeys a Dump\n" . Dumper($rx);
-					Process_Rx_Msg($rx);
 				}
 				case ord('H') { # 'H'
 					$Verbose = 1;
@@ -1722,15 +1731,21 @@ sub HotKeys {
 					$Verbose = 0;
 				}
 				case ord('L') { # 'L'
-					$rx->{'text'} = 'where XE1F-7';
-					print "  HotKeys a Dump\n" . Dumper($rx);
-					Process_Rx_Msg($rx);
+					$Rx->{'text'} = 'where XE1F-7';
+					print "  HotKeys L Rx\n" . Dumper($Rx);
+					Process_Rx_Msg($Rx);
 				}
 				case ord('M') { # 'M'
 					# Send a TMS.
-					$rx->{'text'} = 'Test 01.';
-					print "  Hotkeys a Dump\n" . Dumper($rx);
-					Process_Rx_Msg($rx);
+					$Rx->{'text'} = 'Test 01.';
+					print "  HotKeys M Rx\n" . Dumper($Rx);
+					Process_Rx_Msg($Rx);
+				}
+				case ord('O') { # 'O'
+					# TMS Object.
+					$Rx->{'text'} = 'Obj N0CALL power Testing Object 01';
+					print "  HotKeys O Rx\n" . Dumper($Rx);
+					Process_Rx_Msg($Rx);
 				}
 				case ord('Q') { # 'Q'
 					$Run = 0;
@@ -1739,14 +1754,24 @@ sub HotKeys {
 					$Run = 0;
 				}
 				case ord('S') { # 'S'
-					$rx->{'text'} = 'sms 5554356002 Testing SMS 01';
-					print "  HotKeys a Dump\n" . Dumper($rx);
-					Process_Rx_Msg($rx);
+					$Rx->{'text'} = 'sms 5554356002 Testing SMS 01';
+					print "  HotKeys S Rx\n" . Dumper($Rx);
+					Process_Rx_Msg($Rx);
+				}
+				case ord('T') { # 'T'
+					TRBO::NET::debug(1);
+					TRBO::Common::debug(1);
+					TRBO::DupeCache::debug(1);
+				}
+				case ord('t') { # 't'
+					TRBO::NET::debug(0);
+					TRBO::Common::debug(0);
+					TRBO::DupeCache::debug(0);
 				}
 				case ord('W') { # 'W'
-					$rx->{'text'} = 'wea MMMX';
-					print "  HotKeys a Dump\n" . Dumper($rx);
-					Process_Rx_Msg($rx);
+					$Rx->{'text'} = 'wea MMMX';
+					print "  HotKeys W Rx\n" . Dumper($Rx);
+					Process_Rx_Msg($Rx);
 				}
 				case 0x41 { # 'UpKey'
 					print "UpKey Pressed.\n";
@@ -1813,7 +1838,7 @@ sub MainLoop {
 					'comment' => $My_Comment,
 					'callsign' => $APRS_Callsign
 				};
-				APRS_IS_Push_Updates();
+#				APRS_IS_Push_Position_Updates();
 			}
 			$APRS_NextTimer = time() + $APRS_Interval;
 		}
@@ -1824,10 +1849,10 @@ sub MainLoop {
 		scan_spool($config->{'tms_incoming_spool'});
 	}
 
-	my $rx = $Net->receive();
+	my $Rx = $Net->receive();
 
-	if (!$rx) {
-		#print "No rx.\n";
+	if (!$Rx) {
+		#print "No Rx.\n";
 		$Net->registry_scan();
 		$Net->{'tms'}->queue_run();
 		$aprs_msg_cache->scan(300);
@@ -1835,69 +1860,71 @@ sub MainLoop {
 		Dump_State();
 		#next;
 	}
-	print "  rx Dump " . Dumper($rx);
+	print "  Rx\n" . Dumper($Rx);
 
-	if (!defined $rx->{'class'}) {
+	if (!defined $Rx->{'class'}) {
 		# ouch!
 
-	} elsif ($rx->{'class'} eq 'ars') {
-		if ($rx->{'msg'} eq 'hello') {
+	} elsif ($Rx->{'class'} eq 'ars') {
+		if ($Rx->{'msg'} eq 'hello') {
 			# Could have some policy here on what to accept...
 
 			# Register radio internally and start polling it
-			$Net->register_radio($rx);
+			$Net->register_radio($Rx);
 			# After 10 minutes, check if we're getting LOC packets, and if not,
 			# ask for them
 			if ($GPS_Req_Interval) {
-				$rx->{'registry'}->{'consider_loc_req'} = time() + 600;
+#				$Rx->{'registry'}->{'consider_loc_req'} = time() + 600;
+				$Rx->{'registry'}->{'consider_loc_req'} = time() + 60;
 			}
 		}
 
-	} elsif ($rx->{'class'} eq 'loc') {
-		if ($rx->{'msg'} eq 'loc' && defined $rx->{'latitude'}) {
+	} elsif ($Rx->{'class'} eq 'loc') {
+		if ($Rx->{'msg'} eq 'loc' && defined $Rx->{'latitude'}) {
 			if (!($GPS_Req_Interval)) {
-				# Got LOC but not requested - disable
-				$Net->{'loc'}->request_no_locs($rx->{'src_id'});
-			} elsif (defined $rx->{'registry'} && defined $rx->{'registry'}->{'callsign'} 
-					&& APRS_IS_Consider_Beacon($rx)) {
-				if ($Mode != 1){
+				# Got LOC but not requested so Disable it.
+				$Net->{'loc'}->request_no_locs($Rx->{'src_id'});
+			} elsif (defined $Rx->{'registry'} && defined $Rx->{'registry'}->{'callsign'} 
+					&& APRS_IS_Consider_Beacon($Rx)) {
+				if ($Mode){
 					push @upd_q,{
-						'name' => $rx->{'registry'}->{'callsign'},
-						'latitude' => $rx->{'latitude'},
-						'longitude' => $rx->{'longitude'},
-						'symbol' => $rx->{'registry'}->{'symbol'},
-						'speed' => $rx->{'speed'},
+						'name' => $Rx->{'registry'}->{'callsign'},
+						'latitude' => $Rx->{'latitude'},
+						'longitude' => $Rx->{'longitude'},
+						'symbol' => $Rx->{'registry'}->{'symbol'},
+						'speed' => $Rx->{'speed'},
 						'course' => -1,
-						'altitude' => $rx->{'altitude'},
+						'altitude' => $Rx->{'altitude'},
 						'status' => 1,
-						'comment' => $rx->{'registry'}->{'comment'},
-						'callsign' => $rx->{'registry'}->{'callsign'}
+						'comment' => $Rx->{'registry'}->{'comment'},
+						'callsign' => $Rx->{'registry'}->{'callsign'}
 					};
 					print "Mode 1.\n";
+					print $Rx->{'registry'}->{'short_callsign'} . "\n";
 				} else {
 					push @upd_q,{
-						'name' => $rx->{'registry'}->{'callsign'},
+						'name' => $Rx->{'registry'}->{'callsign'},
 						'latitude' => 19.380834,# Test Location.
 						'longitude' => -99.176753,# Test Location.
-						'symbol' => $rx->{'registry'}->{'symbol'},
+						'symbol' => $Rx->{'registry'}->{'symbol'},
 						'speed' => -1,
 						'course' => -1,
 						'altitude' => 2000, # Test Location.
 						'status' => 1,
-						'comment' => $rx->{'registry'}->{'comment'},
-						'callsign' => $rx->{'registry'}->{'callsign'}
+						'comment' => $Rx->{'registry'}->{'comment'},
+						'callsign' => $Rx->{'registry'}->{'callsign'}
 					};
-					print "Mode else.\n";
-					print $rx->{'registry'}->{'short_callsign'} . "\n";
+					print "Mode 0.\n";
+					print $Rx->{'registry'}->{'short_callsign'} . "\n";
 				}
-				APRS_IS_Push_Updates();
+				APRS_IS_Push_Position_Updates();
 			}
 		}
-		$rx->{'registry'}->{'last_loc'} = time();
+		$Rx->{'registry'}->{'last_loc'} = time();
 
-	} elsif ($rx->{'class'} eq 'tms') {
-		if ($rx->{'msg'} eq 'msg') {
-			Process_Rx_Msg($rx);
+	} elsif ($Rx->{'class'} eq 'tms') {
+		if ($Rx->{'msg'} eq 'msg') {
+			Process_Rx_Msg($Rx);
 		}
 	}
 	if ($Verbose >= 5) { print "Looping the right way.\n"; }

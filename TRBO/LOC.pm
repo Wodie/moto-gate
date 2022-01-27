@@ -35,32 +35,34 @@ Decodes packet on location port
 
 sub decode($$$) {
 	my($self, $rh, $data) = @_;
-	
+
 	print color('cyan'), "TRBO::LOC::decode\n", color('reset');
 	$self->_rx_accounting($data);
-	
+
 	my $plen = length($data);
-	
+
 	if ($plen < 2) {
 		return $self->_fail($rh, 'plen_short');
 	}
-	
+
 	$rh->{'class'} = 'loc';
-	
+
 	my $cmd = unpack('C', substr($data, 0, 1));
 	my $dlen = unpack('C', substr($data, 1, 1));
+	print color('grey12');
 	$self->_debug(sprintf("LOC cmd %02x dlen $dlen plen $plen", $cmd));
-	
+	print color('reset');
+
 	if ($dlen != $plen - 2) {
 		return $self->_fail($rh, 'plen_mismatch');
 	}
-	
-	
+
+
 	if ($cmd == 0x0d) {
 		my $token = unpack('C', substr($data, 8, 1));
 		$self->_debug(sprintf("0x0d: location report, token %02x", $token));
 		if ($token != 0x69 && $token != 0x51) {
-			$self->_info(sprintf("%s: LOC RX (timed) token 0x%02x indicates no GPS fix", $rh->{'src_id'}, $token));
+			$self->_info(sprintf("%s: LOC Rx (timed) token 0x%02x indicates no GPS fix", $rh->{'src_id'}, $token));
 			return 1;
 		}
 		return $self->_decode_loc($rh, $data, $plen);
@@ -92,22 +94,22 @@ sub decode($$$) {
 			return 1;
 		}
 	} elsif ($cmd == 0x11) {
-		$self->_debug("0x11: command reply: " . TRBO::Common::_hex_dump(substr($data, 2)));
+		$self->_debug("0x11: Command Reply: " . TRBO::Common::_hex_dump(substr($data, 2)));
 		$rh->{'msg'} = 'ack';
 		return 1;
 	}
-	
+
 	return $self->_fail($rh, 'unknown');
 }
 
 sub _decode_loc($$$$) {
 	my($self, $rh, $data, $plen) = @_;
-	
+
 	print color('cyan'), "TRBO::LOC::decode_loc\n", color('reset');
 	# Latitude and longitude are packed as network byte order integers with
 	# little scaling to make them firmly integers in packet.
 	# This was pain to get right. GPS simulator helped.
-	# First bit in integer is sign.	
+	# First bit in integer is sign.
 	my $x = 45.0 / 1073741824.0;
  
 # Old Code working
@@ -123,23 +125,23 @@ sub _decode_loc($$$$) {
 #	my $lng = ($lng_i & 0x7FFFFFFF) * 2 * $x;
 #	$lng *= -1 if ($lng_i & 0x80000000);
 
-	
+
 	# Altitude and speed probably encoded bit like in BER/ASN.1/SNMP:
 	# "base-128 in big-endian order where the 8th bit is 1 if more bytes follow and 0 for the last byte"
 	# (the same encoding is used in ARS config packets too)
 	my $i = 17; # this is where altitude and speed probably are.
 	my($alt, $speed) = (-10000, -1); # Changed to default value so it pass to APRS::FAP::make_object.
-	
+
 	$self->_info(sprintf('%s: LOC RX lat %.6f lng %.6f speed %d alt %d', $rh->{'src_id'}, $lat, $lng, $speed, $alt));
-	
+
 	$rh->{'msg'} = 'loc';
 	$rh->{'latitude'} = $lat;
 	$rh->{'longitude'} = $lng;
 	$rh->{'alt'} = $alt;
 	$rh->{'speed'} = $speed;
-	
+
 	#warn "addr: '$addr'\n";
-	
+
 	return 1;
 }
 
@@ -156,19 +158,19 @@ at specified interval.
 
 sub request_locs($$$) {
 	my($self, $id, $interval) = @_;
-	
+
 	print color('cyan'), "TRBO::LOC::request_locs\n", color('reset');
 	$self->_info($id . ": Requesting location every $interval s");
-	
+
 	# disable loc sends / cancel old requests
 	# apparently radio not take in new command otherwise!
 	$self->request_no_locs($id);
-		
-	sleep(1);
 	
+	sleep(1);
+
 	# have no idea what this really contains, except for interval which
 	# is BER encoded in end.
-	
+
 	$self->_send($id,
 		pack('n*', 0x2204, 0x3727, 0x1707)
 		. pack('n*', 0x5074, 0x6934)
@@ -189,7 +191,7 @@ Send request to radio not to send location packets.
 
 sub request_no_locs($$$) {
 	my($self, $id, $interval) = @_;
-	
+
 	print color('cyan'), "TRBO::LOC::request_no_locs\n", color('reset');
 	# disable loc sends?
 	$self->_send($id,
@@ -199,14 +201,14 @@ sub request_no_locs($$$) {
 
 sub _pack($$;$) {
 	my($self, $data, $prefix) = @_;
-	
+
 	print color('cyan'), "TRBO::LOC::pack\n", color('reset');
 	my $out = pack('C', length($data)) . $data;
-	
+
 	if (defined $prefix) {
 		$out = $prefix . $out;
 	}
-	
+
 	return $out;
 }
 
