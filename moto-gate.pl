@@ -94,7 +94,7 @@ print "----------------------------------------------------------------------\n"
 
 # Load Settings ini file.
 print color('green'), "Loading Settings...\n", color('reset');
-my $config = Config::IniFiles->new( -file => "/home/pi/moto_x/config.ini");
+my $config = Config::IniFiles->new( -file => "/home/pi/moto-gate/config.ini");
 # Settings:
 my $State_Dump_File = $config->val('Settings', 'state_dump');
 my $RadioID_URL = $config->val('Settings', 'RadioID_URL');
@@ -246,7 +246,7 @@ print "----------------------------------------------------------------------\n"
 print color('green'), "Loading Users...\n", color('reset');
 my $Users;
 #my @cfgfiles = ( '/home/pi/moto_x/users.conf', 'users.conf', '/usr/local/etc/users.conf', 
-my @cfgfiles = ( '/home/pi/moto_x/users.conf' );
+my @cfgfiles = ( '/home/pi/moto-gate/users.conf' );
 # select which config file is present
 my $counter;
 my $cfgfile;
