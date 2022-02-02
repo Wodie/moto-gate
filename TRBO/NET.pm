@@ -201,16 +201,9 @@ sub configure_radio($$) {
 	my $radio = $self->add_radio($rx->{'id'});
 	
 	$radio->{'callsign'} = $rx->{'callsign'};
-	$radio->{'short_callsign'} = $rx->{'short_callsign'};
 	$radio->{'name'} = $rx->{'name'};
 	$radio->{'symbol'} = $rx->{'symbol'};
 	$radio->{'comment'} = $rx->{'comment'};
-	$radio->{'email_username'} = $rx->{'email_username'};
-	$radio->{'email_password'} = $rx->{'email_password'};
-	$radio->{'sms_username'} = $rx->{'sms_username'};
-	$radio->{'sms_password'} = $rx->{'sms_password'};
-	$radio->{'sms_reply_id'} = $rx->{'sms_reply_id'};
-	$radio->{'sms_reply_phone'} = $rx->{'sms_reply_phone'};
 
 	$self->{'reg_call'}->{$rx->{'callsign'}} = $radio;
 
@@ -267,10 +260,7 @@ Find radio from registry by callsign.
 sub registry_find_call($$) {
 	my($self, $call) = @_;
 
-	my $debug = 1;
-	print "Call $call XXX" . length($call) . "\n";
-
-	if ($debug) {print color('cyan'), "TRBO::NET::registry_find_call $call\n", color('reset');}
+	print color('cyan'), "TRBO::NET::registry_find_call $call " . length($call) . "\n", color('reset');
 	return if (!defined $self->{'reg_call'}->{$call});
 	
 	return $self->{'reg_call'}->{$call};

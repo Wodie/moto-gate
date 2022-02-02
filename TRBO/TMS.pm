@@ -40,7 +40,7 @@ Init.
 sub init($) {
 	my($self) = @_;
 	
-	print color('cyan'), "TRBO::TMS::init\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::TMS::init\n", color('reset');}
 	$self->{'msgid_cache'} = new TRBO::DupeCache();
 	$self->{'msgid_cache'}->init();
 
@@ -66,7 +66,7 @@ Decodes text message packet
 sub tms_decode($$$) {
 	my($self, $rh, $data) = @_;
 	
-	print color('cyan'), "TRBO::TMS::tms_decode\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::TMS::tms_decode\n", color('reset');}
 	$self->_rx_accounting($data);
 	
 	my $plen = length($data);
@@ -103,13 +103,13 @@ sub tms_decode($$$) {
 sub _decode_msg($$$) {
 	my($self, $rh, $data) = @_;
 	
-	print color('cyan'), "TRBO::TMS::_decode_msg\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::TMS::_decode_msg\n", color('reset');}
 	my $op_b = unpack('C', substr($data, 2, 1));
 
-	$self->_debug("tms op_b " . sprintf('%02x', $op_b));
+	#$self->_debug("tms op_b " . sprintf('%02x', $op_b));
 	
 	my $prefixlen = unpack('C', substr($data, 5, 1));
-	$self->_debug("prefixlen $prefixlen");
+	#$self->_debug("prefixlen $prefixlen");
 	
 	# Msgid is 5 bits, 0 to 0x1f. Found out hard way - transmitted
 	# message to radio with msgid 0x20 (32) and it ACKed msg 0. So I
@@ -118,16 +118,16 @@ sub _decode_msg($$$) {
 	my $msgid = unpack('C', substr($data, 4, 1)) & 0x1f;
 
 	my $msgdata = substr($data, 6 + $prefixlen);
-	$self->_debug("msgdata: " . TRBO::Common::_hex_dump($msgdata));
+	#$self->_debug("msgdata: " . TRBO::Common::_hex_dump($msgdata));
 
 	# Message appears to be in 16-bit character encoding. For ASCII messages,
 	# Every second byte is NULL.
 	$msgdata =~ s/\0//g;
 	$msgdata = $enc_latin->decode($msgdata);
 	$msgdata = $enc_utf8->encode($msgdata);
-	$self->_debug("after decoding: $msgdata");
+	#$self->_debug("after decoding: $msgdata");
 	
-	print color('cyan');
+	print color('bright_magenta');
 	$self->_debug("Rx Message: $msgdata");
 	print color('reset');
 	
@@ -173,7 +173,7 @@ Sends ACK to received message. Pass in received message.
 sub ack_msg($$) {
 	my($self, $rh) = @_;
 	
-	print color('magenta'), "TRBO::TMS::ack_msg\n", color('reset');
+	if ($debug) {print color('magenta'), "TRBO::TMS::ack_msg\n", color('reset');}
 	print color('magenta');
 	$self->_debug("sending msg ack to " . $rh->{'src_id'} . " msgid " . $rh->{'msgid'});
 	print color('reset');
@@ -187,7 +187,7 @@ sub ack_msg($$) {
 sub _decode_ack($$$) {
 	my($self, $rh, $data) = @_;
 	
-	print color('cyan'), "TRBO::TMS::_decode_ack\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::TMS::_decode_ack\n", color('reset');}
 	my $msgid = unpack('C', substr($data, 4));
 	$self->_info($rh->{'src_id'} . ": RX MSG ack for $msgid");
 
@@ -211,7 +211,7 @@ Drop message from transmit queue of destination radio ID.
 sub dequeue_msg($$$) {
 	my($self, $id, $msgid_del) = @_;
 	
-	print color('cyan'), "TRBO::TMS::dequeue_msg\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::TMS::dequeue_msg\n", color('reset');}
 	my $q = $self->{'msgq'}->{$id};
 	if ($#{ $q } < 0) {
 		$self->_debug("dequeue_msg: queue empty");
@@ -244,22 +244,22 @@ Queue text message to be transmitted to radio ID.
 sub queue_msg($$$;$) {
 	my($self, $id, $msg, $group_msg) = @_;
 
-	print color('cyan'), "TRBO::TMS::queue_msg\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::TMS::queue_msg\n", color('reset');}
 	#print "self = $self\n";
 	#print "id = $id\n";
 	#print "msg = $msg\n";
 	if (defined $group_msg) {
 		print "group_msg $group_msg\n";
 	}
-	
+
 	if (!defined($self->{'msgq'})) {
 		$self->{'msgq'} = {};
 	}
-	
+
 	if (!defined($self->{'msgq'}->{$id})) {
 		$self->{'msgq'}->{$id} = [];
 	}
-	
+
 	if (!defined $self->{'msgid'}) {
 		$self->{'msgid'} = 30;
 	}
@@ -301,7 +301,7 @@ transmitted
 sub queue_run($) {
 	my($self) = @_;
 	
-	print color('cyan'), "TRBO::TMS::queue_run\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::TMS::queue_run\n", color('reset');}
 	#$self->_debug("queue_run");
 	#print "self $self\n";
 	#print "self dump:\n" . Dumper($self);
@@ -344,7 +344,7 @@ sub queue_run($) {
 sub _queue_tx($$$) {
 	my($self, $id, $m) = @_;
 
-	print color('cyan'), "TRBO::TMS::_queue_tx\n", color('reset');
+	if ($debug) {print color('cyan'), "TRBO::TMS::_queue_tx\n", color('reset');}
 	$self->_debug("_queue_tx to $id:\n" . Dumper($m));
 
 	if ($m->{'group_msg'}) {
@@ -375,7 +375,7 @@ sub _queue_tx($$$) {
 sub _pack($$;$) {
 	my($self, $data, $prefix) = @_;
 
-	#print "TRBO::TMS::_pack\n";
+	#if ($debug) {print "TRBO::TMS::_pack\n";}
 	my $out = pack('n', length($data)) . $data;
 	if (defined $prefix) {
 		$out = $prefix . $out;

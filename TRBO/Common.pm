@@ -19,6 +19,7 @@ my $debug = 0;
 
 use strict;
 use warnings;
+use Data::Dumper;
 use Term::ANSIColor;
 
 use Socket;
@@ -274,7 +275,21 @@ sub _make_addr($$;$) {
 	my($self, $id, $group_net) = @_;
 
 	if ($debug) {print color('cyan'), "TRBO::Common::_make_addr\n", color('reset');}
-	my $host = (defined $group_net && ($group_net)) ? $self->{'config'}->{'cai_group_net'} : $self->{'config'}->{'cai_net'};
+
+	#print "id = $id\n";
+	#print "self->{'config'}->{'cai_net'} = $self->{'config'}->{'cai_net'}\n";
+	#print "group_net = $group_net\n";
+	#print "\n" . Dumper($self);
+
+	#my $host = (defined $group_net && ($group_net)) ? $self->{'config'}->{'cai_group_net'} : $self->{'config'}->{'cai_net'};
+	my $host;
+	if (defined $group_net && ($group_net)) {
+		#print "Group id $group_net\n";
+		$host = $group_net;
+	} else {
+		#print "Private id $id\n";
+		$host = $self->{'config'}->{'cai_net'};
+	}
 	$host .= '.' . (($id >> 16) & 0xff) .'.' . (($id >> 8) & 0xff) . '.' . ($id & 0xff);
 	my $hisiaddr = inet_aton($host);
 	$self->_debug("_make_addr id = $id, host = $host " . $self->{'config'}->{'port'});
@@ -297,19 +312,19 @@ sub _send($$$;$$) {
 
 	print color('magenta'), "TRBO::Common::_send\n", color('reset');
 	#print "self = $self\n";
-	#print "id = $id\n";
+	print "id = $id\n";
 	#print "data = $data\n";
-	#if (defined $prefix) {
-		#print "prefix = $prefix\n";
-	#}
-	#if (defined $group_net) {
-		#print "group_net = $group_net\n";
-	#}
+	if (defined $prefix) {
+		print "prefix = $prefix\n";
+	}
+	if (defined $group_net) {
+		print "group_net = $group_net\n";
+	}
 
 	my $out = $self->_pack($data, $prefix);
 
 	print color('magenta');
-	#print "out $out\n";
+	print "out $out\n";
 	$self->_debug("_send to $id:" . $self->{'config'}->{'port'} . "\n");
 	print color('reset');
 	#Bytes_2_HexString($out);

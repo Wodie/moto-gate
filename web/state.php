@@ -173,18 +173,18 @@ function print_body() {
 print '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "https://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="https://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xml:lang="%language%" lang="%language%">
 	<head>
-		<title>DMR-APRS-SMS Gateway</title>
+		<title>Moto-Gate</title>
 		<link rel="stylesheet" type="text/css" href="trbo.css" />
 	</head>
 
 	<body>
 		<script type="text/JavaScript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
-		<div class="title" id="title">DMR-APRS-SMS Gateway <span id="at"></span></div>
+		<div class="title" id="title">Moto-Gate <span id="at"></span></div>
 		<div class="radios" id="radios">Initializing ...</div>
 		<div class="table" id="table"></div>
 		<div class="unshown" id="unshown"></div>
 
-		<div class="footer">DMR-APRS-SMS Gateway - Created by Juan Carlos Pérez KM4NNO / XE1F.</div>
+		<div class="footer">Moto-Gate - Created by Juan Carlos Pérez KM4NNO / XE1F.</div>
 
 		<script type="text/JavaScript">
 

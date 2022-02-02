@@ -3489,10 +3489,8 @@ sub make_position($$$$$$;$) {
 				# TODO: could use DHM timestamp here
 			}
 		} else {
-# Section modified by Juan Carlos KM4NNO:
-			$retstring = '!'; # Line commented.
-#			$retstring = ''; # Line added. Fix for uncompressed and objects.
-# End of modification
+			#$retstring = '!'; # Line commented.
+			$retstring = ''; # Line created by Juan Caros KM4NNO.
 		}
 		$retstring .= $latstring . $symboltable . $lonstring . $symbolcode;
 		
